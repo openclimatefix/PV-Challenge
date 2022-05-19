@@ -2,7 +2,7 @@
 
 At OCF we are building a state of the art national solar generation forecast that will be used by National Grid.
 By improving the solar generation forecast, we can help them to minimise the use of standby gas turbines,
-potentially leading to a substantial reduction in carbon emissions. 
+potentially leading to a substantial reduction in carbon emissions.
 
 ## Challenge
 
@@ -23,3 +23,8 @@ Validation splits can be made how you wish in the training subset.
 You can of course use other data, for example
 [satellite data](https://huggingface.co/datasets/openclimatefix/eumetsat_uk_hrv), or NWP data,
 but you are welcome to use other sources
+
+# How
+
+Please contact [OCF](info@openclimatefix.org) if you like to contribute, or make a PR.
+We are interested in getting lots of people involved and building a great solution together.
