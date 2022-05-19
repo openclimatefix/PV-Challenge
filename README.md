@@ -24,6 +24,11 @@ You can of course use other data, for example
 [satellite data](https://huggingface.co/datasets/openclimatefix/eumetsat_uk_hrv), or NWP data,
 but you are welcome to use other sources
 
+### Metrics
+
+For now lets use MAE, but perhaps we can explore a few other metrics that help differentiate
+a excellent model, from a good model
+
 # How
 
 Please contact [OCF](info@openclimatefix.org) if you like to contribute, or make a PR.
