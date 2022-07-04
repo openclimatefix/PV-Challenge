@@ -7,7 +7,7 @@ potentially leading to a substantial reduction in carbon emissions.
 ## Challenge
 
 Build the best PV forecasting model you can.
-The model should forecast a PV system for the next 24 hours.
+The model should forecast a PV system for the next 24 hours. The forecast should be in 30 minutes intervals, and show the average power produced in that 30 minute interval. 
 
 We would recommend that you use current data from other PV systems to help improve the forecast.
 
