@@ -33,3 +33,14 @@ a excellent model, from a good model
 
 Please contact [OCF](info@openclimatefix.org) if you like to contribute, or make a PR.
 We are interested in getting lots of people involved and building a great solution together.
+
+
+## Files
+
+### Data
+
+The data folder contains the locations of the pv sites from [the dataset](https://huggingface.co/datasets/openclimatefix/uk_pv)
+
+### Scripts
+
+There is a script to extract NWP data from a large file. This file unfortunately is not public. 
