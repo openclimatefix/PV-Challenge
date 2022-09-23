@@ -55,9 +55,8 @@ def extract_one_location(nwp, x_osgb, y_osgb, id):
     nwp = nwp.sel(x=((nwp.x > x_osgb - 2000) & (nwp.x < x_osgb + 2000)))
     nwp = nwp.sel(y=((nwp.y > y_osgb - 2000) & (nwp.y < y_osgb + 2000)))
 
-    # COul interpolate but for the moment, lets just take the first value
+    # Could interpolate but for the moment, lets just take the first value
     nwp = nwp.isel(x=0, y=0)
-    nwp = nwp.isel(init_time=list(range(0, 20)))
 
     # nwp = nwp.rename(name_dict={"UKV": id})
 
@@ -95,4 +94,6 @@ for i in tqdm(range(len(locations))):
     else:
         extract_one_location(nwp, x_osgb, y_osgb, id)
 
-# One site this is about 1MB for 2020 and 2021
+# One site this is about 3MB for 2020 and 2021
+
+# Currently taking 6 mins for each site.

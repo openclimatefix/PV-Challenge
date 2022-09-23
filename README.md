@@ -43,4 +43,4 @@ The data folder contains the locations of the pv sites from [the dataset](https:
 
 ### Scripts
 
-There is a script to extract NWP data from a large file. This file unfortunately is not public. 
+There is a script to extract NWP data from a large file. This file unfortunately is not public.
