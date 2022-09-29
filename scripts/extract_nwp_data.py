@@ -21,6 +21,7 @@ import xarray as xr
 import pandas as pd
 import os
 from tqdm import tqdm
+from multiprocessing import Pool
 
 zarr_path = "~/../../mnt/storage_ssd_8tb/data/ocf/solar_pv_nowcasting/nowcasting_dataset_pipeline/NWP/UK_Met_Office/UKV/zarr/UKV_intermediate_version_3.zarr"
 
@@ -77,22 +78,23 @@ def extract_one_location(nwp, x_osgb, y_osgb, id):
 
 
 # loop over all sites
-for i in tqdm(range(len(locations))):
+with futures.ThreadPoolExecutor() as executor:
+    for i in tqdm(range(len(locations))):
 
-    location = locations.iloc[i]
-    nwp = nwp_all
-    x_osgb = location.x_osgb
-    y_osgb = location.y_osgb
-    id = int(location.ss_id)
+        location = locations.iloc[i]
+        nwp = nwp_all
+        x_osgb = location.x_osgb
+        y_osgb = location.y_osgb
+        id = int(location.ss_id)
 
-    print(id)
-    print(f"Doing {i} out of {len(locations)}")
+        print(id)
+        print(f"Doing {i} out of {len(locations)}")
 
-    filename = f"data/{id}.netcdf"
-    if os.path.exists(filename):
-        print(f"File ({filename}) already exists")
-    else:
-        extract_one_location(nwp, x_osgb, y_osgb, id)
+        filename = f"data/{id}.netcdf"
+        if os.path.exists(filename):
+            print(f"File ({filename}) already exists")
+        else:
+            executor.submit(extract_one_location, nwp, x_osgb, y_osgb, id)
 
 # One site this is about 3MB for 2020 and 2021
 
