@@ -22,6 +22,12 @@ from torchmetrics import MeanSquaredLogError
 
 logger = logging.getLogger(__name__)
 
+# set up logging
+logging.basicConfig(
+    level=getattr(logging, "INFO"),
+    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+)
+
 activities = [torch.profiler.ProfilerActivity.CPU]
 if torch.cuda.is_available():
     activities.append(torch.profiler.ProfilerActivity.CUDA)
@@ -31,15 +37,10 @@ import numpy as np
 
 np.random.seed(2)
 
-# set up logging
-logging.basicConfig(
-    level=getattr(logging, "INFO"),
-    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
-)
-
 
 # make iterattor
-nwp_pv = nwp_pv_datapipe("experiments/002/exp_002.yaml")
+nwp_pv = nwp_pv_datapipe("experiments/004_video/exp_004.yaml")
+nwp_pv_test = nwp_pv_datapipe("experiments/004_video/exp_004.yaml", tag="test")
 
 dl = DataLoader(dataset=nwp_pv, batch_size=None)
 nwp_pv_iter = iter(dl)
@@ -48,12 +49,12 @@ nwp_pv_iter = iter(dl)
 batch = next(nwp_pv_iter)
 
 
-def plot(batch, y_hat):
+def plot(batch, y_hat, batch_idx=1, epoch=0, tag='train'):
     y = batch[BatchKey.pv][:, :, 0]
     time_y_hat = batch[BatchKey.pv_time_utc][:, batch[BatchKey.pv_t0_idx] :]
     time = batch[BatchKey.pv_time_utc]
     ids = batch[BatchKey.pv_id].detach().numpy()
-    ids = [str(id) for id in ids]
+    ids = [str(int(id[0])) for id in ids]
 
     fig = make_subplots(rows=4, cols=4, subplot_titles=ids)
 
@@ -62,11 +63,25 @@ def plot(batch, y_hat):
         col = i // 4 + 1
         time_i = pd.to_datetime(time[i], unit="s")
         time_y_hat_i = pd.to_datetime(time_y_hat[i], unit="s")
+
+        if i == 0:
+            showlegend = True
+        else:
+            showlegend = False
+
         trace_1 = go.Scatter(
-            x=time_i, y=y[i].detach().numpy(), name="truth", line=dict(color="blue")
+            x=time_y_hat_i,
+            y=y[i, -len(time_y_hat_i) :].detach().numpy(),
+            name="truth",
+            line=dict(color="blue"),
+            showlegend=showlegend,
         )
         trace_2 = go.Scatter(
-            x=time_y_hat_i, y=y_hat[i].detach().numpy(), name="predict", line=dict(color="red")
+            x=time_y_hat_i,
+            y=y_hat[i].detach().numpy(),
+            name="predict",
+            line=dict(color="red"),
+            showlegend=showlegend,
         )
 
         fig.add_trace(trace_1, row=row, col=col)
@@ -74,7 +89,16 @@ def plot(batch, y_hat):
 
     fig.update_yaxes(range=[0, 1])
 
-    fig.show(renderer="browser")
+    # fig.show(renderer="browser")
+    filename = f"experiments/004_video/images/fig_e{epoch}_b{batch_idx}_{tag}.png"
+    if epoch < 10:
+        filename = f"experiments/004_video/images/fig_e0{epoch}_b{batch_idx}_{tag}.png"
+    fig.write_image(
+        filename,
+        scale=1,
+        width=1000,
+        height=800,
+    )
 
 
 def batch_to_x(batch):
@@ -116,7 +140,7 @@ class BaseModel(pl.LightningModule):
     def __init__(self):
         super().__init__()
 
-    def _training_or_validation_step(self, x, return_model_outputs: bool = False, tag='train'):
+    def _training_or_validation_step(self, x, return_model_outputs: bool = False, tag="train"):
         """
         batch: The batch data
         tag: either 'Train', 'Validation' , 'Test'
@@ -135,8 +159,8 @@ class BaseModel(pl.LightningModule):
         bce_loss = torch.nn.BCELoss()(y_hat, y)
         msle_loss = MeanSquaredLogError()(y_hat, y)
 
-        loss = mse_loss + mae_loss + bce_loss*0.1
-        if tag=='val':
+        loss = mse_loss + mae_loss + bce_loss * 0.1
+        if tag == "val":
             on_step = False
         else:
             on_step = True
@@ -153,17 +177,17 @@ class BaseModel(pl.LightningModule):
 
     def training_step(self, x, batch_idx):
 
-        if batch_idx < 1:
-            plot(x, self(x))
+        if batch_idx < 3:
+            plot(x, self(x), batch_idx, epoch=self.current_epoch, tag='train')
 
-        return self._training_or_validation_step(x, tag='tra')
+        return self._training_or_validation_step(x, tag="tra")
 
     def validation_step(self, x, batch_idx):
 
-        if batch_idx < 1:
-            plot(x, self(x))
+        if batch_idx < 3:
+            plot(x, self(x), batch_idx, epoch=self.current_epoch, tag='val')
 
-        return self._training_or_validation_step(x,tag='val')
+        return self._training_or_validation_step(x, tag="val")
 
     def predict_step(self, x, batch_idx, dataloader_idx=0):
         return x, self(x)
@@ -209,33 +233,21 @@ class Model(BaseModel):
 trainer = Trainer(
     accelerator="auto",
     devices=None,
-    max_epochs=10,
+    max_epochs=100,
 )
-
-def worker_init_fn(worker_id):
-
-    # get_worker_info() returns information specific to each worker process.
-    worker_info = torch.utils.data.get_worker_info()
-    if worker_info is None:
-        print("worker_info is None!")
-    else:
-        # The NowcastingDataset copy in this worker process.
-        dataset_obj = worker_info.dataset
-        dataset_obj.per_worker_init(worker_info.id)
-
-
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, n_batches: int):
+    def __init__(self, n_batches: int, tag: str = "train"):
 
         self.n_batches = n_batches
-        # self.nwp_pv = nwp_pv_datapipe("experiments/002/exp_002.yaml")
-        # dl = DataLoader(dataset=nwp_pv, batch_size=None)
-        # self.nwp_pv = iter(nwp_pv)
+        self.tag = tag
 
-    def per_worker_init(self, worker_id):
-        self.nwp_pv = iter(nwp_pv)
+        if self.tag == "train":
+            self.nwp_pv = iter(nwp_pv)
+        else:
+            self.nwp_pv = iter(nwp_pv_test)
+
     #     self._profile_name = 'test'
 
     def __len__(self):
@@ -257,19 +269,19 @@ output_length = y.shape[1]
 
 def main():
 
-    train_loader = DataLoader(Dataset(n_batches=100), batch_size=None, num_workers=4, worker_init_fn=worker_init_fn)
-    val_loader = DataLoader(Dataset(n_batches=10), batch_size=None, num_workers=2, worker_init_fn=worker_init_fn)
-    predict_loader = DataLoader(Dataset(n_batches=1), batch_size=None, num_workers=0)
+    train_loader = DataLoader(Dataset(n_batches=10), batch_size=None)
+    predict_loader = DataLoader(
+        Dataset(n_batches=1, tag="test"),
+        batch_size=None,
+    )
 
     model = Model(input_length=input_length, output_length=output_length)
 
-    trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=predict_loader)
 
     # predict model for some plots
-    batch = next(nwp_pv)
+    batch = next(iter(nwp_pv))
     y_hat = model(batch)
-
-    plot(batch, y_hat)
 
     ##### plot results
     plot(batch, y_hat)
@@ -277,39 +289,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# ***** Brief results ******
-# just on training data 3 epochs (max 40 batches, batch_size=4)
-
-# pv history, sun and nwp (4 hour)
-# loss = 0.264
-
-# pv history, sun and nwp (24 hours)
-# loss = 0.277
-
-# pv history (48 hours), sun and nwp (forecast 24 hours)
-# loss = 0.277
-
-
-# begun to notice some odd data
-# Idea: drop data if 24 hours of zeros
-# pv history (48 hours), sun and nwp (forecast 24 hours)
-
-# also solved bug in ocf peipes with yield
-# loss = 0.246
-
-# Batch size 32
-# loss = 0.244
-
-# not using sun, location, or capacity
-# loss = 249
-
-# full 1000 sites, similar loss after 6 epochs
-# loss 0.238
-
-# solved t0 bug on ocf datapipes, this should NWP data can now be used
-# loss bcd = 0.229
-# loss mse = 0.0109
-# loss mae = 0.054
-
-

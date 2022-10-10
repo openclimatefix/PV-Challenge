@@ -35,7 +35,7 @@ logging.basicConfig(
 
 
 # make iterattor
-nwp_pv = nwp_pv_datapipe("experiments/003_baseline/exp_003.yaml")
+nwp_pv = nwp_pv_datapipe("experiments/003_baseline/exp_003_4h.yaml")
 
 dl = DataLoader(dataset=nwp_pv, batch_size=None)
 nwp_pv = iter(dl)
@@ -62,11 +62,13 @@ class BaseModel(pl.LightningModule):
 
         # calculate mse, mae
         mse_loss = F.mse_loss(y_hat, y)
-        mae_loss = ((y_hat - y)**2).abs().mean()
+        mae_loss = (y_hat - y).abs().mean()
         bce_loss = torch.nn.BCELoss()(y_hat, y)
         loss = bce_loss
 
-        self.log('mae',loss, on_step=True, on_epoch=True,prog_bar=True)
+        self.log('bce_loss',bce_loss, on_step=True, on_epoch=True,prog_bar=True)
+        self.log('mse_loss', mse_loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('mae_loss', mae_loss, on_step=True, on_epoch=True, prog_bar=True)
 
         if return_model_outputs:
             return loss, y_hat
@@ -96,10 +98,16 @@ class Model(BaseModel):
     def forward(self, x):
 
         # return 0's
-        out = torch.zeros_like(x[BatchKey.pv][:, :x[BatchKey.pv_t0_idx], 0]) + 0.01
+        # out = torch.zeros_like(x[BatchKey.pv][:, x[BatchKey.pv_t0_idx]:, 0]) + 0.01
+
+        # return the last value
+        b,n = (x[BatchKey.pv][:, x[BatchKey.pv_t0_idx]:, 0]).shape
+        out = x[BatchKey.pv][:, x[BatchKey.pv_t0_idx], 0]
+        out = out.repeat(n).reshape((n,b)).transpose(0,1)
 
         # return yesterday
-        # out = x[BatchKey.pv][:, :x[BatchKey.pv_t0_idx], 0]
+        # n = len(x[BatchKey.pv][0, x[BatchKey.pv_t0_idx]:, 0])
+        # out = x[BatchKey.pv][:, :n, 0]
         return out
 
 
@@ -172,3 +180,20 @@ fig.show(renderer="browser")
 # just returned zeros
 # mse loss = 0.041, 0.045, 0.045   ( 3 runs)
 # bcd loss = 0.485
+
+
+# Tested with 400 samples (for prediction 4 hours)
+# project forward yesterday results gives a
+# mse loss = 0.19
+# mae loss = 0.061
+# bcd loss = 0.26
+
+# project forward the last results
+# mse loss = 0.024
+# mae loss = 0.0815
+# bcd loss = 0.86
+
+# just returned zeros
+# mse loss = 0.039
+# mae loss = 0.01
+# bcd loss = 0.468
